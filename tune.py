@@ -1,4 +1,5 @@
-from review.dataset import prepare_amazon_fine_food_review_dataset
+from review.dataset import prepare_amazon_fine_food_review_dataset, \
+    prepare_amazon_consumer_affairs_review_dataset
 from review.feature import add_features_to_dataset
 from review.clean import clean_dataset
 from review.model import LogisticRegressionClassifierWrapper, \
@@ -10,8 +11,10 @@ from time import time
 
 
 start = time()
-dataset = prepare_amazon_fine_food_review_dataset(validation_proportion=0.15,
-                                                  test_proportion=0.15)
+# dataset = prepare_amazon_fine_food_review_dataset(validation_proportion=0.15,
+#                                                   test_proportion=0.15)
+dataset = prepare_amazon_consumer_affairs_review_dataset(validation_proportion=0.1,
+                                                         test_proportion=0.1)
 dataset = clean_dataset(dataset)
 # dataset = add_features_to_dataset(dataset)
 print('Preparing dataset, cleaning dataset, and adding features took {0} seconds.'.
