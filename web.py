@@ -32,7 +32,10 @@ def prepare_dataset(review_text):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    result = {'review_rating': '',
+              'review_dex': '',
+              'review_text': ''}
+    return render_template('index.html', result=result)
 
 
 @app.route("/classify/", methods=['POST'])
