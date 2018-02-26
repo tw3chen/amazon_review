@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Amazon Review Classification Prototype</title>
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css"
+          rel="stylesheet">
+        <style>
+            body {
+                padding-top: 30px;
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+            .vcenter {
+                display: inline-block;
+                vertical-align: middle;
+                float: none;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-inverse navbar-fixed-top">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#">Amazon Review Classification Prototype</a>
+            </div>
+            <div id="navbar" class="collapse navbar-collapse text-right ">
+            </div><!--/.nav-collapse -->
+
+          </div>
+        </nav>
+
+        <p><br/></p>
+
+        <form action="/classify/" method="post">
+            <div id="page-wrapper">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="form-group">
+                            <label for="comment">Insert Review Text:</label>
+                            <textarea name="review-text" class="form-control" rows="5" id="comment">{{ result['review_text'] }}</textarea>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" type="submit">Classify</button>
+                </div>
+                <!-- /.container-fluid -->
+            </div>
+            {% if result %}
+            <div class="container">
+                <p class="text-success">{{ result['review_rating'] }}</p>
+                <p class="text-info">{{ result['review_dex'] }}</p>
+            </div>
+            {% endif %}
+            <!-- /#page-wrapper -->
+        </form>
+    </body>
+</html>

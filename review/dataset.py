@@ -52,9 +52,11 @@ def prepare_amazon_fine_food_review_dataset(validation_proportion=0.15, test_pro
 
 def prepare_amazon_consumer_affairs_review_dataset(validation_proportion=0.15, test_proportion=0.15):
     raw_df = pd.read_csv('data/amazon_consumer_affairs_review/consumer_affairs_amazon_review_shuffled_labelled.csv')
+    raw_df = raw_df.iloc[38:60]# raw_df.iloc[100:450]
     raw_df = raw_df[~raw_df.dex_sentiment.isnull()]
     X = raw_df[['review_text']]
-    X = X.sample(frac=1, random_state=0).reset_index(drop=True)
+    X.reset_index(drop=True)
+    # X = X.sample(frac=1, random_state=0).reset_index(drop=True)
     X.columns = [TEXT_COLUMN_NAME]
     y = raw_df['dex_sentiment']
     X_train, y_train, \

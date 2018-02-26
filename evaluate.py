@@ -10,7 +10,7 @@ from sklearn.model_selection import GridSearchCV
 from time import time
 
 
-model_path = 'model/classifier.pickle'
+model_path = 'model/dex/classifier.pickle'
 
 
 start = time()
@@ -25,15 +25,15 @@ print('Preparing dataset, cleaning dataset, and adding features took {0} seconds
 
 
 start = time()
-classifier = LogisticRegressionClassifierWrapper()
+classifier = LogisticRegressionClassifierWrapper(tfidf_ngram_range=(1,1), lr_inverse_reg=2)
 classifier.fit(dataset.X_train, dataset.y_train)
 # load classifier from file instead of training
 # classifier = load_model(model_path)
-score_validation = classifier.score(dataset.X_validation, dataset.y_validation)
-print('Validation Accuracy: ', score_validation)
-score_test = classifier.score(dataset.X_test, dataset.y_test)
-print('Test Accuracy: ', score_test)
-print('Evaluation took {0} seconds.'.format(time()-start))
+# score_validation = classifier.score(dataset.X_validation, dataset.y_validation)
+# print('Validation Accuracy: ', score_validation)
+# score_test = classifier.score(dataset.X_test, dataset.y_test)
+# print('Test Accuracy: ', score_test)
+# print('Evaluation took {0} seconds.'.format(time()-start))
 
 
 start = time()

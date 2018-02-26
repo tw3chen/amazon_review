@@ -35,7 +35,7 @@ def load_model(model_path):
 
 class LogisticRegressionClassifierWrapper(BaseEstimator, ClassifierMixin):
     def __init__(self, tfidf_ngram_range=(1,1), tfidf_min_df=3, tfidf_max_df=0.9, tfidf_sublinear_tf=True,
-                 lr_inverse_reg=4):
+                 lr_inverse_reg=4, lr_dual=True, lr_penalty="l2", lr_fit_intercept=True, lr_class_weight=None):
         self.tfidf_vectorizer = None
         self.classifier = None
         self.tfidf_ngram_range = tfidf_ngram_range
@@ -43,6 +43,10 @@ class LogisticRegressionClassifierWrapper(BaseEstimator, ClassifierMixin):
         self.tfidf_max_df = tfidf_max_df
         self.tfidf_sublinear_tf = tfidf_sublinear_tf
         self.lr_inverse_reg = lr_inverse_reg
+        self.lr_dual = lr_dual
+        self.lr_penalty = lr_penalty
+        self.lr_fit_intercept = lr_fit_intercept
+        self.lr_class_weight = lr_class_weight
 
     def _construct_X_features(self, X):
         X_tfidf = self.tfidf_vectorizer.transform(X[TEXT_COLUMN_NAME])
@@ -61,7 +65,9 @@ class LogisticRegressionClassifierWrapper(BaseEstimator, ClassifierMixin):
                                                 use_idf=1, smooth_idf=1, sublinear_tf=self.tfidf_sublinear_tf)
         self.tfidf_vectorizer.fit(X[TEXT_COLUMN_NAME])
         X_features = self._construct_X_features(X)
-        classifier = LogisticRegression(C=self.lr_inverse_reg, dual=True)
+        classifier = LogisticRegression(C=self.lr_inverse_reg, dual=self.lr_dual,
+                                        penalty=self.lr_penalty, fit_intercept=self.lr_fit_intercept,
+                                        class_weight=self.lr_class_weight)
         classifier.fit(X_features, y)
         self.classifier = classifier
         return self
@@ -82,7 +88,7 @@ class LogisticRegressionClassifierWrapper(BaseEstimator, ClassifierMixin):
 
 class XGBoostClassifierWrapper(BaseEstimator, ClassifierMixin):
     def __init__(self, tfidf_ngram_range=(1,1), tfidf_min_df=3, tfidf_max_df=0.9, tfidf_sublinear_tf=True,
-                 svd_num_dim=100,
+                 svd_num_dim=200,
                  xgb_num_tree=100, xgb_learning_rate=0.1, xgb_min_child_weight=1,
                  xgb_max_depth=3, xgb_reg_alpha=0, xgb_reg_lambda=1):
         self.tfidf_vectorizer = None
@@ -102,7 +108,6 @@ class XGBoostClassifierWrapper(BaseEstimator, ClassifierMixin):
 
     def _construct_X_features(self, X):
         X_tfidf = self.tfidf_vectorizer.transform(X[TEXT_COLUMN_NAME])
-        #X_reduced = X_tfidf
         X_reduced = self.dimension_reducer.transform(X_tfidf)
         other_column_names = list(X.columns)
         other_column_names.remove(TEXT_COLUMN_NAME)
@@ -116,19 +121,17 @@ class XGBoostClassifierWrapper(BaseEstimator, ClassifierMixin):
         self.tfidf_vectorizer = TfidfVectorizer(ngram_range=self.tfidf_ngram_range,
                                                 min_df=self.tfidf_min_df, max_df=self.tfidf_max_df,
                                                 strip_accents='unicode',
-                                                use_idf=1, smooth_idf=1, sublinear_tf=self.tfidf_sublinear_tf,
-                                                max_features=100000, stop_words='english')
+                                                use_idf=1, smooth_idf=1, sublinear_tf=self.tfidf_sublinear_tf)
         self.dimension_reducer = TruncatedSVD(n_components=self.svd_num_dim)
         X_tfidf = self.tfidf_vectorizer.fit_transform(X[TEXT_COLUMN_NAME])
-        #self.tfidf_vectorizer.fit(X[TEXT_COLUMN_NAME])
         self.dimension_reducer.fit(X_tfidf)
         X_features = self._construct_X_features(X)
         classifier = XGBClassifier(n_estimators=self.xgb_num_tree,
-                                   min_child_weight=100,
-                                   learning_rate=0.05,
-                                   max_depth=5,
-                                   reg_alpha=1,
-                                   reg_lambda=4)
+                                   min_child_weight=self.xgb_min_child_weight,
+                                   learning_rate=self.xgb_learning_rate,
+                                   max_depth=self.xgb_max_depth,
+                                   reg_alpha=self.xgb_reg_alpha,
+                                   reg_lambda=self.xgb_reg_lambda)
         classifier.fit(X_features, y)
         self.classifier = classifier
         return self
@@ -147,6 +150,7 @@ class XGBoostClassifierWrapper(BaseEstimator, ClassifierMixin):
         return accuracy_score(y, y_pred)
 
 
+# code taken from Kaggle for building a attention layer for a deep network
 class Attention(Layer):
     def __init__(self, step_dim,
                  W_regularizer=None, b_regularizer=None,
@@ -219,10 +223,11 @@ class Attention(Layer):
 
 def define_bidirectional_lstm_attention_nn(max_sequence_length,
                                            num_classes,
-                                           embedding_size, embedding_matrix):
+                                           embedding_size, embedding_matrix,
+                                           embedding_trainable=True):
     inputs = Input(shape=(max_sequence_length, ))
     embeddings = Embedding(len(embedding_matrix), embedding_size, weights=[embedding_matrix],
-                           trainable=True)(inputs)
+                           trainable=embedding_trainable)(inputs)
     bidirectional_lstm = Bidirectional(LSTM(embedding_size, return_sequences=True, dropout=0.25,
                                             recurrent_dropout=0.25))(embeddings)
     attention = Attention(max_sequence_length)(bidirectional_lstm)
@@ -245,6 +250,8 @@ def make_glovevec(glovepath, max_features, embed_size, word_index):
     nb_words = min(max_features, len(word_index))
     embedding_matrix = np.zeros((nb_words+1, embed_size))
     for word, i in word_index.items():
+        if i >= max_features:
+            continue
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[i] = embedding_vector
@@ -264,7 +271,9 @@ class DeepLearningClassifierWrapper(BaseEstimator, ClassifierMixin):
     def __init__(self, max_features_for_text=100000, embedding_size=300, max_text_length=300,
                  batch_size=256, epochs=10, validation_proportion=0.05,
                  keras_model_path="model/keras_deep_learning.model",
-                 embedding_path="data/glove/glove.840B.300d.txt"):
+                 embedding_path="data/glove/glove.840B.300d.txt",
+                 load_keras_model=False,
+                 embedding_trainable=True):
         self.tokenizer = None
         self.embedding_matrix = None
         self.label_binarizer = None
@@ -277,6 +286,8 @@ class DeepLearningClassifierWrapper(BaseEstimator, ClassifierMixin):
         self.validation_proportion = validation_proportion
         self.keras_model_path = keras_model_path
         self.embedding_path = embedding_path
+        self.load_keras_model = load_keras_model
+        self.embedding_trainable = embedding_trainable
 
     def _construct_X_features(self, X):
         X_tokenized = self.tokenizer.texts_to_sequences(X[TEXT_COLUMN_NAME].values)
@@ -294,14 +305,16 @@ class DeepLearningClassifierWrapper(BaseEstimator, ClassifierMixin):
         keras_model = define_bidirectional_lstm_attention_nn(self.max_text_length,
                                                              binarized_y.shape[1],
                                                              self.embedding_size,
-                                                             self.embedding_matrix)
+                                                             self.embedding_matrix,
+                                                             embedding_trainable=self.embedding_trainable)
         keras_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
         ckpt = ModelCheckpoint(self.keras_model_path, monitor="val_loss", verbose=1,
                                save_best_only=True, mode="min")
         early = EarlyStopping(monitor="val_loss", mode="min", patience=1)
-        keras_model.fit(X_features, binarized_y.values, batch_size=self.batch_size, epochs=self.epochs,
-                        validation_split=self.validation_proportion,
-                        callbacks=[ckpt, early])
+        if not self.load_keras_model:
+            keras_model.fit(X_features, binarized_y.values, batch_size=self.batch_size, epochs=self.epochs,
+                            validation_split=self.validation_proportion,
+                            callbacks=[ckpt, early])
         keras_model.load_weights(self.keras_model_path)
         self.keras_model = keras_model
         return self
